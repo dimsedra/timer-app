@@ -1,6 +1,6 @@
 [package]
 name = "timer-app"
-version = "0.1.1"
+version = "0.1.2"
 description = "Minimalist Looping Multi-Timer"
 authors = ["Dimas Edra"]
 edition = "2021"
