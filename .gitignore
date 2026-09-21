@@ -11,3 +11,8 @@ src-tauri/target/
 *.local
 .vscode/
 .idea/
+
+# Signing keys (keep secret)
+*.key
+*.key.pub
+

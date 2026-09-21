@@ -1,5 +1,13 @@
 import { TimerItem, AppSettings } from '../core/types';
 
+export interface UpdateInfo {
+  available: boolean;
+  version?: string;
+  isInstalling?: boolean;
+  progress?: number;
+  message?: string;
+}
+
 export interface AppViewCallbacks {
   onStart: (id: string) => void;
   onPause: (id: string) => void;
@@ -12,6 +20,8 @@ export interface AppViewCallbacks {
   onClose: () => void;
   onSaveSettings: (settings: AppSettings) => void;
   onTestChime: () => void;
+  onCheckUpdate: () => void;
+  onInstallUpdate: () => void;
 }
 
 export class AppView {
@@ -20,6 +30,7 @@ export class AppView {
   private showSettings = false;
   private lastTimers: TimerItem[] = [];
   private lastSettings: AppSettings | null = null;
+  private updateInfo: UpdateInfo = { available: false };
 
   constructor(root: HTMLElement, callbacks: AppViewCallbacks) {
     this.root = root;
@@ -31,6 +42,13 @@ export class AppView {
     const secs = seconds % 60;
     const pad = (n: number) => n.toString().padStart(2, '0');
     return `${pad(mins)}:${pad(secs)}`;
+  }
+
+  setUpdateInfo(info: UpdateInfo): void {
+    this.updateInfo = info;
+    if (this.lastSettings) {
+      this.render(this.lastTimers, this.lastSettings, document.body.classList.contains('mini-mode'));
+    }
   }
 
   render(timers: TimerItem[], settings: AppSettings, isMini: boolean): void {
@@ -141,6 +159,28 @@ export class AppView {
       </div>
 
       <div class="container">
+        ${
+          this.updateInfo.available
+            ? `
+          <div class="update-banner">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="update-led"></span>
+              <span style="font-size: 11px; letter-spacing: 0.08em;">
+                UPDATE AVAILABLE: v${this.updateInfo.version || ''}
+              </span>
+            </div>
+            <button class="btn btn-update" id="btn-update-now" ${this.updateInfo.isInstalling ? 'disabled' : ''}>
+              ${
+                this.updateInfo.isInstalling
+                  ? `DOWNLOADING ${this.updateInfo.progress || 0}%`
+                  : 'UPDATE & RESTART'
+              }
+            </button>
+          </div>
+        `
+            : ''
+        }
+
         <div class="timer-list" style="display:flex; flex-direction:column; gap:12px;">
           ${timerCardsHtml}
         </div>
@@ -193,6 +233,23 @@ export class AppView {
               <input type="range" id="setting-volume" min="0" max="1" step="0.05" value="${settings.soundVolume}" style="accent-color: var(--accent-red); cursor: pointer;" />
             </div>
             <button class="btn" id="btn-test-chime" style="align-self: flex-start;">TEST CHIME</button>
+
+            <div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+                <span style="color: var(--text-muted);">UPDATES</span>
+                <span style="color: ${this.updateInfo.available ? 'var(--accent-red)' : 'var(--text-muted)'}; font-size: 10px;">
+                  ${this.updateInfo.available ? `v${this.updateInfo.version} AVAILABLE` : 'UP TO DATE'}
+                </span>
+              </div>
+              <button class="btn" id="btn-check-update" style="align-self: flex-start;">
+                CHECK FOR UPDATES
+              </button>
+              ${
+                this.updateInfo.message
+                  ? `<div style="font-size: 10px; color: var(--text-muted);">${this.updateInfo.message}</div>`
+                  : ''
+              }
+            </div>
           </div>
         </div>
       </div>
@@ -235,6 +292,14 @@ export class AppView {
 
     document.getElementById('btn-test-chime')?.addEventListener('click', () => {
       this.callbacks.onTestChime();
+    });
+
+    document.getElementById('btn-check-update')?.addEventListener('click', () => {
+      this.callbacks.onCheckUpdate();
+    });
+
+    document.getElementById('btn-update-now')?.addEventListener('click', () => {
+      this.callbacks.onInstallUpdate();
     });
 
     const toastCheckbox = document.getElementById('setting-toast') as HTMLInputElement | null;

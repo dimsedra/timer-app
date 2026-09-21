@@ -360,3 +360,49 @@ body.mini-mode .btn {
   gap: 16px;
   border-radius: 2px;
 }
+
+/* Update Banner */
+.update-banner {
+  background: var(--surface);
+  border: 1px solid var(--accent-red);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: 2px;
+  box-shadow: 0 0 12px var(--accent-red-glow);
+  margin-bottom: 4px;
+}
+
+.update-led {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-red);
+  box-shadow: 0 0 6px var(--accent-red-glow);
+  animation: ledPulse 1.2s infinite ease-in-out;
+  flex-shrink: 0;
+}
+
+.btn-update {
+  background: var(--accent-red);
+  color: #fff;
+  border: 1px solid var(--accent-red);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 10px;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.btn-update:hover:not(:disabled) {
+  background: #e62229;
+  border-color: #e62229;
+}
+
+.btn-update:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+

@@ -4,6 +4,7 @@ import { StorageManager } from './core/storage';
 import { SoundSynthesizer } from './core/sound';
 import { WindowManager } from './desktop/windowManager';
 import { NotificationBridge } from './desktop/notification';
+import { AppUpdater } from './desktop/updater';
 import { AppView } from './ui/appView';
 
 async function bootstrap() {
@@ -14,6 +15,7 @@ async function bootstrap() {
   const sound = new SoundSynthesizer();
   const windowManager = new WindowManager();
   const notifications = new NotificationBridge();
+  const updater = new AppUpdater();
 
   await notifications.init();
 
@@ -86,6 +88,26 @@ async function bootstrap() {
     onTestChime: () => {
       sound.preview(settings.soundVolume);
     },
+    onCheckUpdate: async () => {
+      appView.setUpdateInfo({ available: false, message: 'CHECKING...' });
+      const status = await updater.checkForUpdates();
+      if (status.available) {
+        appView.setUpdateInfo({ available: true, version: status.version });
+      } else {
+        appView.setUpdateInfo({ available: false, message: 'LATEST VERSION INSTALLED' });
+      }
+    },
+    onInstallUpdate: async () => {
+      try {
+        appView.setUpdateInfo({ available: true, isInstalling: true, progress: 0 });
+        await updater.installUpdate((percent) => {
+          appView.setUpdateInfo({ available: true, isInstalling: true, progress: percent });
+        });
+      } catch (err) {
+        console.error('Update failed:', err);
+        appView.setUpdateInfo({ available: true, isInstalling: false, message: 'UPDATE FAILED' });
+      }
+    },
   });
 
   // Regular tick loop (200ms tick for responsive UI updates without cpu strain)
@@ -99,6 +121,14 @@ async function bootstrap() {
 
   // Initial render
   renderCurrent();
+
+  // Check for updates on startup
+  updater.checkForUpdates().then((status) => {
+    if (status.available) {
+      appView.setUpdateInfo({ available: true, version: status.version });
+    }
+  }).catch(() => {});
 }
 
 bootstrap().catch(console.error);
+

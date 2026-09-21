@@ -29,6 +29,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["nsis"],
     "icon": [
       "icons/32x32.png",
@@ -37,5 +38,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ1RDk3Q0ZBQkFGM0ZDMzAKUldRdy9QTzYrbnpaMVk1ZkhVdGdybUhTblQ4Zm1NazNVaUQwRVdzZnVLTmxjVWpRcGxYTkpMbUwK",
+      "endpoints": [
+        "https://github.com/dimsedra/timer-app/releases/latest/download/latest.json"
+      ]
+    }
   }
 }
