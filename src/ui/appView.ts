@@ -31,10 +31,12 @@ export class AppView {
   private lastTimers: TimerItem[] = [];
   private lastSettings: AppSettings | null = null;
   private updateInfo: UpdateInfo = { available: false };
+  private isMini = false;
 
   constructor(root: HTMLElement, callbacks: AppViewCallbacks) {
     this.root = root;
     this.callbacks = callbacks;
+    this.initGlobalDelegation();
   }
 
   private formatTime(seconds: number): string {
@@ -44,16 +46,173 @@ export class AppView {
     return `${pad(mins)}:${pad(secs)}`;
   }
 
+  private initGlobalDelegation(): void {
+    // Click delegation on root: ensures clicks never get lost on DOM updates
+    this.root.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (!target) return;
+
+      // Close modal by clicking overlay outside card
+      if (target.id === 'modal-overlay') {
+        this.showSettings = false;
+        if (this.lastSettings) this.render(this.lastTimers, this.lastSettings, this.isMini);
+        return;
+      }
+
+      const button = target.closest('button');
+      if (!button) return;
+
+      if (button.id === 'titlebar-close') {
+        this.callbacks.onClose();
+        return;
+      }
+      if (button.id === 'titlebar-minimize') {
+        this.callbacks.onMinimize();
+        return;
+      }
+      if (button.id === 'btn-compact' || button.id === 'btn-expand') {
+        this.callbacks.onToggleMini();
+        return;
+      }
+      if (button.id === 'btn-settings') {
+        this.showSettings = true;
+        if (this.lastSettings) this.render(this.lastTimers, this.lastSettings, this.isMini);
+        return;
+      }
+      if (button.id === 'btn-close-settings') {
+        this.showSettings = false;
+        if (this.lastSettings) this.render(this.lastTimers, this.lastSettings, this.isMini);
+        return;
+      }
+      if (button.id === 'btn-test-chime') {
+        this.callbacks.onTestChime();
+        return;
+      }
+      if (button.id === 'btn-check-update') {
+        this.callbacks.onCheckUpdate();
+        return;
+      }
+      if (button.id === 'btn-update-now') {
+        this.callbacks.onInstallUpdate();
+        return;
+      }
+
+      // Action buttons (cards)
+      const action = button.dataset.action;
+      const id = button.dataset.id;
+      if (action && id) {
+        if (action === 'start') this.callbacks.onStart(id);
+        if (action === 'pause') this.callbacks.onPause(id);
+        if (action === 'reset') this.callbacks.onReset(id);
+        if (action === 'loop') this.callbacks.onToggleLoop(id);
+        if (action === 'delete') this.callbacks.onDelete(id);
+        return;
+      }
+    });
+
+    // Form submit delegation
+    this.root.addEventListener('submit', (e) => {
+      const target = e.target as HTMLFormElement;
+      if (target && target.id === 'form-add-timer') {
+        e.preventDefault();
+        const labelInput = target.querySelector<HTMLInputElement>('#input-label');
+        const minsInput = target.querySelector<HTMLInputElement>('#input-mins');
+        const secsInput = target.querySelector<HTMLInputElement>('#input-secs');
+        const loopInput = target.querySelector<HTMLInputElement>('#input-loop');
+
+        const label = labelInput?.value || '';
+        const mins = parseInt(minsInput?.value || '0', 10) || 0;
+        const secs = parseInt(secsInput?.value || '0', 10) || 0;
+        const loop = loopInput ? loopInput.checked : true;
+
+        this.callbacks.onAddTimer(label, mins, secs, loop);
+        target.reset();
+      }
+    });
+
+    // Inputs delegation for settings
+    this.root.addEventListener('change', (e) => {
+      const target = e.target as HTMLInputElement;
+      if (!target || !this.lastSettings) return;
+
+      if (target.id === 'setting-toast') {
+        this.callbacks.onSaveSettings({
+          ...this.lastSettings,
+          toastNotifications: target.checked,
+        });
+      }
+    });
+
+    this.root.addEventListener('input', (e) => {
+      const target = e.target as HTMLInputElement;
+      if (!target || !this.lastSettings) return;
+
+      if (target.id === 'setting-volume') {
+        const vol = parseFloat(target.value);
+        const valDisplay = this.root.querySelector('#volume-val');
+        if (valDisplay) valDisplay.textContent = `${Math.round(vol * 100)}%`;
+        this.callbacks.onSaveSettings({
+          ...this.lastSettings,
+          soundVolume: vol,
+        });
+      }
+    });
+  }
+
   setUpdateInfo(info: UpdateInfo): void {
     this.updateInfo = info;
     if (this.lastSettings) {
-      this.render(this.lastTimers, this.lastSettings, document.body.classList.contains('mini-mode'));
+      this.render(this.lastTimers, this.lastSettings, this.isMini);
+    }
+  }
+
+  /**
+   * High-frequency tick updates (only updates numbers and active states in-place, ZERO DOM teardown)
+   */
+  updateTicks(timers: TimerItem[]): void {
+    this.lastTimers = timers;
+    const hasRunning = timers.some((t) => t.state === 'running');
+
+    // Update titlebar LED without re-rendering titlebar
+    const led = this.root.querySelector('.titlebar-led');
+    if (led) {
+      led.classList.toggle('active', hasRunning);
+    }
+
+    // Update digits & start/pause button for existing cards in place
+    for (const t of timers) {
+      const card = this.root.querySelector<HTMLElement>(`[data-timer-id="${t.id}"]`);
+      if (card) {
+        const digits = card.querySelector('.timer-digits');
+        if (digits) {
+          const timeStr = this.formatTime(t.remainingSeconds);
+          if (digits.textContent !== timeStr) {
+            digits.textContent = timeStr;
+          }
+        }
+
+        const startPauseBtn = card.querySelector<HTMLButtonElement>('[data-action="start"], [data-action="pause"]');
+        if (startPauseBtn) {
+          const isRunning = t.state === 'running';
+          const currentAction = startPauseBtn.dataset.action;
+          if (isRunning && currentAction !== 'pause') {
+            startPauseBtn.dataset.action = 'pause';
+            startPauseBtn.className = 'btn';
+            startPauseBtn.textContent = 'PAUSE';
+          } else if (!isRunning && currentAction !== 'start') {
+            startPauseBtn.dataset.action = 'start';
+            startPauseBtn.className = 'btn btn-primary';
+            startPauseBtn.textContent = 'START';
+          }
+        }
+      }
     }
   }
 
   render(timers: TimerItem[], settings: AppSettings, isMini: boolean): void {
     this.lastTimers = timers;
     this.lastSettings = settings;
+    this.isMini = isMini;
 
     document.body.classList.toggle('mini-mode', isMini);
     const hasRunningTimer = timers.some((t) => t.state === 'running');
@@ -79,7 +238,7 @@ export class AppView {
       contentHtml = activeTimers
         .map(
           (t) => `
-        <div class="timer-card">
+        <div class="timer-card" data-timer-id="${t.id}">
           <div class="timer-header">
             <span class="timer-label" title="${t.label}">${t.label}</span>
             <span class="badge-loop ${t.loop ? 'active' : ''}">
@@ -102,27 +261,25 @@ export class AppView {
     }
 
     this.root.innerHTML = `
-      <div class="titlebar" data-tauri-drag-region>
+      <div class="titlebar">
         <div class="titlebar-title" data-tauri-drag-region>
           <div class="titlebar-led ${hasRunning ? 'active' : ''}"></div>
           MINI
         </div>
-        <div class="titlebar-actions">
+        <div class="titlebar-actions" data-tauri-drag-region="false">
           <button class="btn-icon" id="btn-expand" title="Expand to Normal View">[^]</button>
           <button class="btn-icon" id="titlebar-close" title="Close">x</button>
         </div>
       </div>
       <div class="container">${contentHtml}</div>
     `;
-
-    this.attachMiniEvents();
   }
 
   private renderNormal(timers: TimerItem[], settings: AppSettings, hasRunning: boolean): void {
     const timerCardsHtml = timers
       .map(
         (t) => `
-      <div class="timer-card">
+      <div class="timer-card" data-timer-id="${t.id}">
         <div class="timer-header">
           <span class="timer-label" title="${t.label}">${t.label}</span>
           <button class="btn btn-loop ${t.loop ? 'active' : ''}" data-action="loop" data-id="${t.id}">
@@ -145,12 +302,12 @@ export class AppView {
       .join('');
 
     this.root.innerHTML = `
-      <div class="titlebar" data-tauri-drag-region>
+      <div class="titlebar">
         <div class="titlebar-title" data-tauri-drag-region>
           <div class="titlebar-led ${hasRunning ? 'active' : ''}"></div>
           TIMER // DESKTOP
         </div>
-        <div class="titlebar-actions">
+        <div class="titlebar-actions" data-tauri-drag-region="false">
           <button class="btn-icon" id="btn-compact" title="Switch to Mini Floating Mode">_[]</button>
           <button class="btn-icon" id="btn-settings" title="Settings">*</button>
           <button class="btn-icon" id="titlebar-minimize" title="Minimize">-</button>
@@ -208,8 +365,6 @@ export class AppView {
 
       ${this.showSettings ? this.renderSettingsModal(settings) : ''}
     `;
-
-    this.attachNormalEvents(settings);
   }
 
   private renderSettingsModal(settings: AppSettings): string {
@@ -254,99 +409,5 @@ export class AppView {
         </div>
       </div>
     `;
-  }
-
-  private attachMiniEvents(): void {
-    document.getElementById('titlebar-close')?.addEventListener('click', () => this.callbacks.onClose());
-    document.getElementById('btn-expand')?.addEventListener('click', () => this.callbacks.onToggleMini());
-
-    this.root.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const action = btn.dataset.action;
-        const id = btn.dataset.id;
-        if (!id) return;
-        if (action === 'start') this.callbacks.onStart(id);
-        if (action === 'pause') this.callbacks.onPause(id);
-        if (action === 'reset') this.callbacks.onReset(id);
-      });
-    });
-  }
-
-  private attachNormalEvents(settings: AppSettings): void {
-    document.getElementById('titlebar-close')?.addEventListener('click', () => this.callbacks.onClose());
-    document.getElementById('titlebar-minimize')?.addEventListener('click', () => this.callbacks.onMinimize());
-    document.getElementById('btn-compact')?.addEventListener('click', () => this.callbacks.onToggleMini());
-    document.getElementById('btn-settings')?.addEventListener('click', () => {
-      this.showSettings = true;
-      if (this.lastSettings) {
-        this.renderNormal(this.lastTimers, this.lastSettings, this.lastTimers.some((t) => t.state === 'running'));
-      }
-    });
-
-    document.getElementById('btn-close-settings')?.addEventListener('click', () => {
-      this.showSettings = false;
-      if (this.lastSettings) {
-        this.renderNormal(this.lastTimers, this.lastSettings, this.lastTimers.some((t) => t.state === 'running'));
-      }
-    });
-
-    document.getElementById('btn-test-chime')?.addEventListener('click', () => {
-      this.callbacks.onTestChime();
-    });
-
-    document.getElementById('btn-check-update')?.addEventListener('click', () => {
-      this.callbacks.onCheckUpdate();
-    });
-
-    document.getElementById('btn-update-now')?.addEventListener('click', () => {
-      this.callbacks.onInstallUpdate();
-    });
-
-    const toastCheckbox = document.getElementById('setting-toast') as HTMLInputElement | null;
-    const volumeSlider = document.getElementById('setting-volume') as HTMLInputElement | null;
-
-    toastCheckbox?.addEventListener('change', () => {
-      this.callbacks.onSaveSettings({
-        ...settings,
-        toastNotifications: toastCheckbox.checked,
-      });
-    });
-
-    volumeSlider?.addEventListener('input', () => {
-      const vol = parseFloat(volumeSlider.value);
-      const valDisplay = document.getElementById('volume-val');
-      if (valDisplay) valDisplay.textContent = `${Math.round(vol * 100)}%`;
-      this.callbacks.onSaveSettings({
-        ...settings,
-        soundVolume: vol,
-      });
-    });
-
-    const addForm = document.getElementById('form-add-timer') as HTMLFormElement | null;
-    addForm?.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const labelInput = document.getElementById('input-label') as HTMLInputElement;
-      const minsInput = document.getElementById('input-mins') as HTMLInputElement;
-      const secsInput = document.getElementById('input-secs') as HTMLInputElement;
-      const loopInput = document.getElementById('input-loop') as HTMLInputElement;
-
-      const mins = parseInt(minsInput.value, 10) || 0;
-      const secs = parseInt(secsInput.value, 10) || 0;
-      this.callbacks.onAddTimer(labelInput.value, mins, secs, loopInput.checked);
-      addForm.reset();
-    });
-
-    this.root.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const action = btn.dataset.action;
-        const id = btn.dataset.id;
-        if (!id) return;
-        if (action === 'start') this.callbacks.onStart(id);
-        if (action === 'pause') this.callbacks.onPause(id);
-        if (action === 'reset') this.callbacks.onReset(id);
-        if (action === 'loop') this.callbacks.onToggleLoop(id);
-        if (action === 'delete') this.callbacks.onDelete(id);
-      });
-    });
   }
 }

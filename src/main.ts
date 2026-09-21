@@ -110,12 +110,12 @@ async function bootstrap() {
     },
   });
 
-  // Regular tick loop (200ms tick for responsive UI updates without cpu strain)
+  // Regular tick loop (200ms tick for responsive in-place UI updates without DOM recreation)
   setInterval(() => {
     const hasRunning = engine.getTimers().some((t) => t.state === 'running');
     if (hasRunning) {
       engine.tick();
-      renderCurrent();
+      appView.updateTicks(engine.getTimers());
     }
   }, 200);
 

@@ -52,6 +52,9 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
+  height: 100%;
+  cursor: default;
 }
 
 .titlebar-led {
@@ -77,6 +80,8 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  position: relative;
+  z-index: 10;
 }
 
 .btn-icon {
