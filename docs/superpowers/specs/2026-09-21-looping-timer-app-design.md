@@ -127,25 +127,28 @@ To ensure accuracy when the app is in the background or minimized:
 
 ## 4. User Interface Specification
 
-### 4.1 Visual Design Language (Refined & Anti-AI-Slop)
-- **Anti-AI-Slop Principles:**
-  - No generic AI tropes: strictly no purple/indigo glow blobs, no neon gradients, no pill-inside-pill clutter, no low-contrast illegible gray microtext.
-  - Feels designed and tactile, not auto-generated. Every button, border, and spacing unit is deliberate.
+### 4.1 Visual Design Language (Nothing OS × Terminal Aesthetic)
+- **Aesthetic Direction:**
+  - Heavily inspired by **Nothing OS** (NDot / industrial retro-futurism) fused with a clean, high-precision **Terminal interface**.
+  - Stark monochrome elegance: deep true-black canvas, crisp white tabular typography, and the iconic Nothing crimson-red accent for active states.
+  - Completely anti-AI-slop: zero mushy gradients, zero blur shadows, no rounded candy pills. Every pixel feels like calibrated instrument hardware.
 - **Palette & Contrast:**
-  - Deep charcoal-slate foundation (`--bg: #0d0f12`, `--surface: #15181e`, `--surface-hover: #1c2028`).
-  - Hairline, crisp structural borders (`--border: rgba(255, 255, 255, 0.08)`).
-  - High-readability typography (`--text-primary: #f1f3f7`, `--text-muted: #8b929f`).
-  - Subtle status accent: Warm amber/emerald whisper (`#10b981` running, `#f59e0b` paused) applied with restraint (small optical status dot or hairline indicator, not loud full-bleed badges).
-- **Typography & Rhythm:**
-  - UI labels: Clean geometric sans (`system-ui, -apple-system, sans-serif`) with balanced optical weights (400 regular, 500 medium).
-  - Timer digits: High-legibility monospaced digits with `font-variant-numeric: tabular-nums` to eliminate layout shift and jitter during countdowns.
-  - Heading and buttons are strictly roman (`font-style: normal`). No decorative italics.
-- **Microinteractions & Tactile States:**
-  - Fast, deliberate transitions (100ms–150ms ease-out). No bouncy or sluggish cartoon animations.
-  - Strict interaction states: default, hover (slight surface brightening), active (subtle 1px downward translation / press feel), and `:focus-visible` (crisp 2px outline for full accessibility).
+  - Canvas: Pure pitch black (`--bg: #080808`).
+  - Card Surfaces: Tactile dark charcoal plates (`--surface: #121212`, `--surface-hover: #1a1a1a`).
+  - Hairline Borders & Dividers: Clean industrial outlines (`--border: #242424`) with subtle dotted/dashed technical dividers.
+  - Text & Monospace Figures: Stark crisp white (`--text-primary: #f5f5f5`) and muted technical gray (`--text-muted: #737373`).
+  - Iconic Accent: Nothing Crimson Red (`--accent-red: #d71920` / `#e11d24`) used deliberately as an optical status LED dot (e.g., active timer pulse, loop indicator), bringing immediate visual identity.
+- **Typography & Technical Layout:**
+  - Fonts: Monospaced terminal font family (`'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace`) with tabular numerical alignment (`font-variant-numeric: tabular-nums`).
+  - Labels & Headers: Uppercase technical notation (`TIMER // 01`, `LOOP [ON/OFF]`, `STATUS: RUNNING`, `RESET [ESC]`).
+  - Digits: Large, bold, hyper-legible terminal countdown readout (`05:00`).
+- **Tactile Microinteractions:**
+  - Instantaneous, clicky response (80ms–100ms transitions).
+  - Buttons styled like physical hardware toggles / terminal keycaps (bordered plates with crisp inset depression on active click).
+  - Subtle breathing LED dot animation in Nothing Crimson Red when a timer is actively counting down.
 - **Copy:**
-  - Concise, direct English only. No conversational fluff or marketing buzzwords.
-  - Clear labels: "Start", "Pause", "Reset", "Delete", "Add Timer", "Loop", "Windows Toast", "Compact View".
+  - Minimalist, technical, concise English:
+  - Actions: `START`, `PAUSE`, `RESET`, `DELETE`, `+ NEW TIMER`, `COMPACT`, `SETTINGS`.
 
 ### 4.2 Views
 1. **Normal View (~380 × 520 px):**
