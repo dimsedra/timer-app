@@ -1,4 +1,5 @@
 import { TimerItem, AppSettings, ChimeType, ToastDuration, ToastOverride } from '../core/types';
+import { WindowMode } from '../desktop/windowManager';
 import { ICONS } from './icons';
 
 export interface UpdateInfo {
@@ -17,6 +18,7 @@ export interface AppViewCallbacks {
   onDelete: (id: string) => void;
   onAddTimer: (label: string, hours: number, minutes: number, seconds: number, loop: boolean) => void;
   onToggleMini: () => void;
+  onToggleFloat?: () => void;
   onMinimize: () => void;
   onClose: () => void;
   onSaveSettings: (settings: AppSettings) => void;
@@ -37,8 +39,8 @@ export class AppView {
   private lastTimers: TimerItem[] = [];
   private lastSettings: AppSettings | null = null;
   private updateInfo: UpdateInfo = { available: false };
-  private isMini = false;
-  private previousMini: boolean | null = null;
+  private currentMode: WindowMode = 'normal';
+  private previousMode: WindowMode | null = null;
 
   constructor(root: HTMLElement, callbacks: AppViewCallbacks) {
     this.root = root;
@@ -47,7 +49,7 @@ export class AppView {
   }
 
   public async animateExit(): Promise<void> {
-    const container = this.root.querySelector('.container');
+    const container = this.root.querySelector('.container') || this.root.querySelector('.float-card');
     if (container) {
       container.classList.add('mode-exit');
       await new Promise((resolve) => setTimeout(resolve, 95));
@@ -74,7 +76,7 @@ export class AppView {
       // Close modal by clicking overlay outside card
       if (target.id === 'modal-overlay') {
         this.showSettings = false;
-        if (this.lastSettings) this.render(this.lastTimers, this.lastSettings, this.isMini);
+        if (this.lastSettings) this.render(this.lastTimers, this.lastSettings, this.currentMode);
         return;
       }
 
@@ -120,6 +122,13 @@ export class AppView {
         return;
       }
 
+      // Clicking anywhere on float-card (or its expand button) returns to normal mode
+      const floatCard = target.closest('.float-card');
+      if (floatCard) {
+        this.callbacks.onToggleFloat?.();
+        return;
+      }
+
       const button = target.closest('button');
       if (!button) return;
 
@@ -131,18 +140,22 @@ export class AppView {
         this.callbacks.onMinimize();
         return;
       }
+      if (button.id === 'btn-float') {
+        this.callbacks.onToggleFloat?.();
+        return;
+      }
       if (button.id === 'btn-compact' || button.id === 'btn-expand') {
         this.callbacks.onToggleMini();
         return;
       }
       if (button.id === 'btn-settings') {
         this.showSettings = true;
-        if (this.lastSettings) this.render(this.lastTimers, this.lastSettings, this.isMini);
+        if (this.lastSettings) this.render(this.lastTimers, this.lastSettings, this.currentMode);
         return;
       }
       if (button.id === 'btn-close-settings') {
         this.showSettings = false;
-        if (this.lastSettings) this.render(this.lastTimers, this.lastSettings, this.isMini);
+        if (this.lastSettings) this.render(this.lastTimers, this.lastSettings, this.currentMode);
         return;
       }
       if (button.id === 'btn-test-chime') {
@@ -232,7 +245,7 @@ export class AppView {
           } else {
             this.expandedTimerConfigs.add(id);
           }
-          if (this.lastSettings) this.render(this.lastTimers, this.lastSettings, this.isMini);
+          if (this.lastSettings) this.render(this.lastTimers, this.lastSettings, this.currentMode);
         }
         return;
       }
@@ -334,7 +347,7 @@ export class AppView {
   setUpdateInfo(info: UpdateInfo): void {
     this.updateInfo = info;
     if (this.lastSettings) {
-      this.render(this.lastTimers, this.lastSettings, this.isMini);
+      this.render(this.lastTimers, this.lastSettings, this.currentMode);
     }
   }
 
@@ -379,24 +392,78 @@ export class AppView {
         }
       }
     }
+
+    // Update float mode widget in place
+    const floatDisplay = this.root.querySelector<HTMLElement>('#float-display');
+    if (floatDisplay) {
+      const closest = this.getClosestTimer(timers);
+      const remaining = closest ? closest.remainingSeconds : 0;
+      const label = closest ? closest.label : 'TIMER';
+      const timeStr = this.formatTime(remaining);
+      if (floatDisplay.textContent?.trim() !== timeStr) {
+        floatDisplay.textContent = timeStr;
+      }
+      const isWarning = !!closest && closest.state === 'running' && remaining <= 30;
+      floatDisplay.classList.toggle('warning', isWarning);
+
+      const floatLabel = this.root.querySelector<HTMLElement>('.float-label');
+      if (floatLabel && floatLabel.textContent !== label) {
+        floatLabel.textContent = label;
+        floatLabel.title = label;
+      }
+    }
   }
 
-  render(timers: TimerItem[], settings: AppSettings, isMini: boolean): void {
+  private getClosestTimer(timers: TimerItem[]): TimerItem | null {
+    const active = timers.filter((t) => t.state === 'running' || t.state === 'paused');
+    if (active.length > 0) {
+      return [...active].sort((a, b) => a.remainingSeconds - b.remainingSeconds)[0];
+    }
+    return timers.length > 0 ? timers[0] : null;
+  }
+
+  private renderFloat(timers: TimerItem[], isEnter = false): void {
+    const timer = this.getClosestTimer(timers);
+    const label = timer ? timer.label : 'TIMER';
+    const remaining = timer ? timer.remainingSeconds : 0;
+    const isWarning = !!timer && timer.state === 'running' && remaining <= 30;
+
+    this.root.innerHTML = `
+      <div class="float-card ${isEnter ? 'mode-enter' : ''}" data-tauri-drag-region>
+        <div class="float-header" data-tauri-drag-region>
+          <span class="float-label" data-tauri-drag-region title="${label}">${label}</span>
+          <button class="float-btn-expand" id="float-expand-btn" title="Expand to Normal View">${ICONS.expand}</button>
+        </div>
+        <div class="float-digits ${isWarning ? 'warning' : ''}" data-tauri-drag-region id="float-display">
+          ${this.formatTime(remaining)}
+        </div>
+      </div>
+    `;
+  }
+
+  render(timers: TimerItem[], settings: AppSettings, modeOrIsMini: WindowMode | boolean): void {
+    const mode: WindowMode = typeof modeOrIsMini === 'boolean'
+      ? (modeOrIsMini ? 'mini' : 'normal')
+      : modeOrIsMini;
+
     // Preserve scroll position
     const container = this.root.querySelector('.container');
     const savedScrollTop = container ? container.scrollTop : 0;
 
-    const modeChanged = this.previousMini !== null && this.previousMini !== isMini;
-    this.previousMini = isMini;
+    const modeChanged = this.previousMode !== null && this.previousMode !== mode;
+    this.previousMode = mode;
+    this.currentMode = mode;
 
     this.lastTimers = timers;
     this.lastSettings = settings;
-    this.isMini = isMini;
 
-    document.body.classList.toggle('mini-mode', isMini);
+    document.body.classList.toggle('mini-mode', mode === 'mini');
+    document.body.classList.toggle('float-mode', mode === 'float');
     const hasRunningTimer = timers.some((t) => t.state === 'running');
 
-    if (isMini) {
+    if (mode === 'float') {
+      this.renderFloat(timers, modeChanged);
+    } else if (mode === 'mini') {
       this.renderMini(timers, hasRunningTimer, modeChanged);
     } else {
       this.renderNormal(timers, settings, hasRunningTimer, modeChanged);
@@ -405,7 +472,7 @@ export class AppView {
     if (modeChanged) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          const c = this.root.querySelector('.container');
+          const c = this.root.querySelector('.container') || this.root.querySelector('.float-card');
           if (c) c.classList.remove('mode-enter');
         });
       });
@@ -461,6 +528,7 @@ export class AppView {
           MINI
         </div>
         <div class="titlebar-actions" data-tauri-drag-region="false">
+          <button class="btn-icon" id="btn-float" title="Switch to Floating Widget">${ICONS.floatWidget}</button>
           <button class="btn-icon" id="btn-expand" title="Expand to Normal View">${ICONS.expand}</button>
           <button class="btn-icon" id="titlebar-close" title="Close">${ICONS.close}</button>
         </div>
@@ -552,6 +620,7 @@ export class AppView {
           TIMER // DESKTOP
         </div>
         <div class="titlebar-actions" data-tauri-drag-region="false">
+          <button class="btn-icon" id="btn-float" title="Switch to Floating Widget">${ICONS.floatWidget}</button>
           <button class="btn-icon" id="btn-compact" title="Switch to Mini Floating Mode">${ICONS.compact}</button>
           <button class="btn-icon" id="btn-settings" title="Settings">${ICONS.settings}</button>
           <button class="btn-icon" id="titlebar-minimize" title="Minimize">${ICONS.minimize}</button>

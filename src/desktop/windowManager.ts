@@ -1,18 +1,30 @@
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 
+export type WindowMode = 'normal' | 'mini' | 'float';
+
 export class WindowManager {
-  private mini = false;
+  private mode: WindowMode = 'normal';
   private appWindow = getCurrentWindow();
 
-  get isMiniMode(): boolean {
-    return this.mini;
+  get currentMode(): WindowMode {
+    return this.mode;
   }
 
-  async setMiniMode(enabled: boolean, activeTimerCount: number = 1): Promise<void> {
-    this.mini = enabled;
+  get isMiniMode(): boolean {
+    return this.mode === 'mini';
+  }
+
+  get isFloatMode(): boolean {
+    return this.mode === 'float';
+  }
+
+  async setMode(targetMode: WindowMode, activeTimerCount = 1): Promise<void> {
+    this.mode = targetMode;
     try {
-      if (enabled) {
-        // Mini mode: width 280px, height dynamically tailored to active timer count (min 154px, max 360px)
+      if (targetMode === 'float') {
+        await this.appWindow.setSize(new LogicalSize(124, 48));
+        await this.appWindow.setAlwaysOnTop(true);
+      } else if (targetMode === 'mini') {
         const count = Math.max(1, activeTimerCount);
         const computedHeight = Math.min(360, 48 + count * 106);
         await this.appWindow.setSize(new LogicalSize(280, computedHeight));
@@ -22,13 +34,20 @@ export class WindowManager {
         await this.appWindow.setAlwaysOnTop(false);
       }
     } catch (err) {
-      // Graceful fallback when running in standard browser/dev mode without Tauri IPC
       console.warn('Tauri window API not available or errored:', err);
     }
   }
 
-  async toggleMiniMode(activeTimerCount: number = 1): Promise<void> {
-    await this.setMiniMode(!this.mini, activeTimerCount);
+  async setMiniMode(enabled: boolean, activeTimerCount = 1): Promise<void> {
+    await this.setMode(enabled ? 'mini' : 'normal', activeTimerCount);
+  }
+
+  async toggleMiniMode(activeTimerCount = 1): Promise<void> {
+    await this.setMode(this.mode === 'mini' ? 'normal' : 'mini', activeTimerCount);
+  }
+
+  async toggleFloatMode(): Promise<void> {
+    await this.setMode(this.mode === 'float' ? 'normal' : 'float');
   }
 
   async setAlwaysOnTop(alwaysOnTop: boolean): Promise<void> {
