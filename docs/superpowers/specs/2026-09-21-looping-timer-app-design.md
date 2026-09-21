@@ -127,29 +127,40 @@ To ensure accuracy when the app is in the background or minimized:
 
 ## 4. User Interface Specification
 
-### 4.1 Visual Design Language
-- **Theme:** Minimalist dark palette (neutral zinc `#09090b` background, subtle borders `#27272a`, muted foreground `#a1a1aa`, high-contrast text `#f4f4f5`).
-- **Typography:** Inter or system sans-serif for UI labels, `monospace` with `font-variant-numeric: tabular-nums` for timer digits to eliminate layout jitter.
-- **Spacing:** Generous padding (16px - 24px) for clear scanning.
-- **Copy:** Concise, unambiguous English:
-  - Buttons: "Start", "Pause", "Reset", "Delete", "Add Timer"
-  - Switches: "Loop", "Windows Toast"
-  - Mode toggle: "Compact View", "Normal View"
+### 4.1 Visual Design Language (Refined & Anti-AI-Slop)
+- **Anti-AI-Slop Principles:**
+  - No generic AI tropes: strictly no purple/indigo glow blobs, no neon gradients, no pill-inside-pill clutter, no low-contrast illegible gray microtext.
+  - Feels designed and tactile, not auto-generated. Every button, border, and spacing unit is deliberate.
+- **Palette & Contrast:**
+  - Deep charcoal-slate foundation (`--bg: #0d0f12`, `--surface: #15181e`, `--surface-hover: #1c2028`).
+  - Hairline, crisp structural borders (`--border: rgba(255, 255, 255, 0.08)`).
+  - High-readability typography (`--text-primary: #f1f3f7`, `--text-muted: #8b929f`).
+  - Subtle status accent: Warm amber/emerald whisper (`#10b981` running, `#f59e0b` paused) applied with restraint (small optical status dot or hairline indicator, not loud full-bleed badges).
+- **Typography & Rhythm:**
+  - UI labels: Clean geometric sans (`system-ui, -apple-system, sans-serif`) with balanced optical weights (400 regular, 500 medium).
+  - Timer digits: High-legibility monospaced digits with `font-variant-numeric: tabular-nums` to eliminate layout shift and jitter during countdowns.
+  - Heading and buttons are strictly roman (`font-style: normal`). No decorative italics.
+- **Microinteractions & Tactile States:**
+  - Fast, deliberate transitions (100ms–150ms ease-out). No bouncy or sluggish cartoon animations.
+  - Strict interaction states: default, hover (slight surface brightening), active (subtle 1px downward translation / press feel), and `:focus-visible` (crisp 2px outline for full accessibility).
+- **Copy:**
+  - Concise, direct English only. No conversational fluff or marketing buzzwords.
+  - Clear labels: "Start", "Pause", "Reset", "Delete", "Add Timer", "Loop", "Windows Toast", "Compact View".
 
 ### 4.2 Views
-1. **Normal View:**
-   - **Header:** App title ("Timer"), Compact mode button, Settings toggle button.
-   - **Timer List:** Vertical stack of timer cards. Each card contains:
-     - Header line: Timer label and a subtle "Loop" toggle switch.
-     - Large countdown display: `MM:SS` (or `HH:MM:SS` if > 60m).
-     - Action buttons: Start/Pause, Reset, Delete.
-   - **Add Timer Section:** Quick form with inputs for Label (optional), Minutes, Seconds, and Loop checkbox.
-   - **Settings Panel:** Overlay/modal to toggle Toast Notifications, test the chime sound, and adjust volume.
-2. **Mini Floating View:**
-   - Always-on-top window.
-   - Filtered view: Displays only timers where `state === 'running'` or `state === 'paused'`.
-   - Compact row layout: Label, large monospaced countdown, play/pause button, and an "Expand" button to return to normal view.
-   - If no timers are active, displays a simple message: "No active timers" with an Expand button.
+1. **Normal View (~380 × 520 px):**
+   - **Header:** Clean titlemark ("Timer"), Compact mode trigger button, and Settings icon button.
+   - **Timer Cards:** Spaced deliberately with generous breathing room. Each card features:
+     - Header: Timer label + understated "Loop" toggle.
+     - Centerpiece: Prominent, steady tabular countdown display (`MM:SS` or `HH:MM:SS`).
+     - Footer: Action buttons (`Start` / `Pause`, `Reset`, and a subtle `Delete` trigger).
+   - **Add Timer Section:** Compact, focused drawer or inline form with clean inputs for duration (minutes, seconds) and a loop checkbox.
+   - **Settings Drawer/Modal:** Clean overlay with toggles for Windows Toast notifications, volume slider, and a chime preview button.
+2. **Mini Floating View (~240 × 110 px dynamic):**
+   - Seamless, borderless always-on-top window with dedicated drag bar.
+   - Strictly displays only timers in `running` or `paused` state. Idle timers are hidden to keep desktop real estate uncluttered.
+   - Compact row presentation: Label, bold tabular countdown, mini play/pause control, and an "Expand" button to restore the full window.
+   - If no timers are active: Calm fallback state ("No active timers") with an Expand button.
 
 ---
 
