@@ -7,6 +7,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   toastNotifications: true,
   soundVolume: 0.8,
   alwaysOnTopMini: true,
+  defaultChime: 'pulse',
+  toastDuration: 'normal',
 };
 
 export class StorageManager {
@@ -14,7 +16,13 @@ export class StorageManager {
     try {
       const data = localStorage.getItem(SETTINGS_KEY);
       if (!data) return { ...DEFAULT_SETTINGS };
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(data) };
+      const parsed = JSON.parse(data);
+      return {
+        ...DEFAULT_SETTINGS,
+        ...parsed,
+        defaultChime: parsed.defaultChime || DEFAULT_SETTINGS.defaultChime,
+        toastDuration: parsed.toastDuration || DEFAULT_SETTINGS.toastDuration,
+      };
     } catch {
       return { ...DEFAULT_SETTINGS };
     }
@@ -38,13 +46,18 @@ export class StorageManager {
             state: 'idle',
             remainingSeconds: 300,
             endTimestamp: null,
+            chime: 'global',
+            toastOverride: 'global',
           },
         ];
       }
       const parsed: TimerItem[] = JSON.parse(data);
       // Ensure any running timers from previous session are safely loaded as paused
+      // and ensure fallback for chime and toastOverride
       return parsed.map((t) => ({
         ...t,
+        chime: t.chime ?? 'global',
+        toastOverride: t.toastOverride ?? 'global',
         state: t.state === 'running' ? 'paused' : t.state,
         endTimestamp: null,
       }));
@@ -56,6 +69,8 @@ export class StorageManager {
   saveTimers(timers: TimerItem[]): void {
     const serialized = timers.map((t) => ({
       ...t,
+      chime: t.chime ?? 'global',
+      toastOverride: t.toastOverride ?? 'global',
       // Never store volatile endTimestamp to disk
       endTimestamp: null,
       state: t.state === 'running' ? 'paused' : t.state,

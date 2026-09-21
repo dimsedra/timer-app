@@ -23,10 +23,39 @@ async function bootstrap() {
   const initialTimers = storage.loadTimers();
   const engine = new TimerEngine(initialTimers);
 
+  // Micro-staggered audio queue (~150ms delay between consecutive chimes)
+  const soundQueue: Array<{ chime: import('./core/types').ChimeType; volume: number }> = [];
+  let isPlayingSound = false;
+
+  const processSoundQueue = () => {
+    if (isPlayingSound || soundQueue.length === 0) return;
+    isPlayingSound = true;
+    const next = soundQueue.shift()!;
+    sound.playChime(next.chime, next.volume);
+    setTimeout(() => {
+      isPlayingSound = false;
+      processSoundQueue();
+    }, 150);
+  };
+
+  const enqueueChime = (chime: import('./core/types').ChimeType, volume: number) => {
+    soundQueue.push({ chime, volume });
+    processSoundQueue();
+  };
+
   // Interval completion trigger
   engine.onComplete((timer) => {
-    sound.playChime(settings.soundVolume);
-    if (settings.toastNotifications) {
+    const chime = timer.chime && timer.chime !== 'global' ? timer.chime : settings.defaultChime;
+    enqueueChime(chime, settings.soundVolume);
+
+    const shouldToast =
+      timer.toastOverride === 'enabled'
+        ? true
+        : timer.toastOverride === 'disabled'
+        ? false
+        : settings.toastNotifications;
+
+    if (shouldToast) {
       notifications.sendTimerFinished(timer.label, timer.loop);
     }
   });
@@ -85,8 +114,16 @@ async function bootstrap() {
       storage.saveSettings(settings);
       renderCurrent();
     },
-    onTestChime: () => {
-      sound.preview(settings.soundVolume);
+    onTestChime: (chime) => {
+      sound.preview(chime || settings.defaultChime, settings.soundVolume);
+    },
+    onPreviewChime: (chime) => {
+      sound.preview(chime, settings.soundVolume);
+    },
+    onUpdateTimerConfig: (id, chime, toastOverride) => {
+      engine.updateConfig(id, chime, toastOverride);
+      storage.saveTimers(engine.getTimers());
+      renderCurrent();
     },
     onCheckUpdate: async () => {
       appView.setUpdateInfo({ available: false, message: 'CHECKING...' });

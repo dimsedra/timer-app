@@ -1,4 +1,4 @@
-import { TimerItem, AppSettings } from '../core/types';
+import { TimerItem, AppSettings, ChimeType, ToastDuration, ToastOverride } from '../core/types';
 
 export interface UpdateInfo {
   available: boolean;
@@ -19,15 +19,18 @@ export interface AppViewCallbacks {
   onMinimize: () => void;
   onClose: () => void;
   onSaveSettings: (settings: AppSettings) => void;
-  onTestChime: () => void;
+  onTestChime: (chime?: ChimeType) => void;
   onCheckUpdate: () => void;
   onInstallUpdate: () => void;
+  onPreviewChime?: (chime: ChimeType) => void;
+  onUpdateTimerConfig?: (id: string, chime: 'global' | ChimeType, toastOverride: ToastOverride) => void;
 }
 
 export class AppView {
   private root: HTMLElement;
   private callbacks: AppViewCallbacks;
   private showSettings = false;
+  private expandedTimerConfigs: Set<string> = new Set();
   private lastTimers: TimerItem[] = [];
   private lastSettings: AppSettings | null = null;
   private updateInfo: UpdateInfo = { available: false };
@@ -85,7 +88,12 @@ export class AppView {
         return;
       }
       if (button.id === 'btn-test-chime') {
-        this.callbacks.onTestChime();
+        const chime = (button.dataset.chime as ChimeType) || this.lastSettings?.defaultChime || 'pulse';
+        if (this.callbacks.onPreviewChime) {
+          this.callbacks.onPreviewChime(chime);
+        } else {
+          this.callbacks.onTestChime(chime);
+        }
         return;
       }
       if (button.id === 'btn-check-update') {
@@ -94,6 +102,26 @@ export class AppView {
       }
       if (button.id === 'btn-update-now') {
         this.callbacks.onInstallUpdate();
+        return;
+      }
+
+      // Setting modal chime pill selector
+      if (button.classList.contains('pill-chime-setting') && button.dataset.chime && this.lastSettings) {
+        const chime = button.dataset.chime as ChimeType;
+        this.callbacks.onSaveSettings({
+          ...this.lastSettings,
+          defaultChime: chime,
+        });
+        return;
+      }
+
+      // Setting modal toast duration pill selector
+      if (button.classList.contains('pill-toast-dur') && button.dataset.duration && this.lastSettings) {
+        const duration = button.dataset.duration as ToastDuration;
+        this.callbacks.onSaveSettings({
+          ...this.lastSettings,
+          toastDuration: duration,
+        });
         return;
       }
 
@@ -106,6 +134,39 @@ export class AppView {
         if (action === 'reset') this.callbacks.onReset(id);
         if (action === 'loop') this.callbacks.onToggleLoop(id);
         if (action === 'delete') this.callbacks.onDelete(id);
+        if (action === 'toggle-cfg') {
+          if (this.expandedTimerConfigs.has(id)) {
+            this.expandedTimerConfigs.delete(id);
+          } else {
+            this.expandedTimerConfigs.add(id);
+          }
+          if (this.lastSettings) this.render(this.lastTimers, this.lastSettings, this.isMini);
+        }
+        if (action === 'set-timer-chime') {
+          const chimeVal = button.dataset.chimeVal as 'global' | ChimeType;
+          const timer = this.lastTimers.find((t) => t.id === id);
+          if (timer && this.callbacks.onUpdateTimerConfig) {
+            this.callbacks.onUpdateTimerConfig(id, chimeVal, timer.toastOverride ?? 'global');
+          }
+        }
+        if (action === 'preview-timer-chime') {
+          const timer = this.lastTimers.find((t) => t.id === id);
+          const chimeType = (timer?.chime && timer.chime !== 'global')
+            ? timer.chime
+            : (this.lastSettings?.defaultChime || 'pulse');
+          if (this.callbacks.onPreviewChime) {
+            this.callbacks.onPreviewChime(chimeType);
+          } else {
+            this.callbacks.onTestChime(chimeType);
+          }
+        }
+        if (action === 'set-timer-toast') {
+          const toastVal = button.dataset.toastVal as ToastOverride;
+          const timer = this.lastTimers.find((t) => t.id === id);
+          if (timer && this.callbacks.onUpdateTimerConfig) {
+            this.callbacks.onUpdateTimerConfig(id, timer.chime ?? 'global', toastVal);
+          }
+        }
         return;
       }
     });
@@ -282,14 +343,23 @@ export class AppView {
 
   private renderNormal(timers: TimerItem[], settings: AppSettings, hasRunning: boolean): void {
     const timerCardsHtml = timers
-      .map(
-        (t) => `
+      .map((t) => {
+        const isConfigOpen = this.expandedTimerConfigs.has(t.id);
+        const currentChime = t.chime ?? 'global';
+        const currentToast = t.toastOverride ?? 'global';
+
+        return `
       <div class="timer-card" data-timer-id="${t.id}">
         <div class="timer-header">
           <span class="timer-label" title="${t.label}">${t.label}</span>
-          <button class="btn btn-loop ${t.loop ? 'active' : ''}" data-action="loop" data-id="${t.id}">
-            LOOP [${t.loop ? 'ON' : 'OFF'}]
-          </button>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <button class="btn btn-cfg ${isConfigOpen ? 'active' : ''}" data-action="toggle-cfg" data-id="${t.id}" title="Toggle Timer Configuration">
+              [CFG]
+            </button>
+            <button class="btn btn-loop ${t.loop ? 'active' : ''}" data-action="loop" data-id="${t.id}">
+              LOOP [${t.loop ? 'ON' : 'OFF'}]
+            </button>
+          </div>
         </div>
         <div class="timer-digits">${this.formatTime(t.remainingSeconds)}</div>
         <div class="timer-actions">
@@ -301,9 +371,36 @@ export class AppView {
           <button class="btn" data-action="reset" data-id="${t.id}">RESET</button>
           <button class="btn btn-danger" data-action="delete" data-id="${t.id}">DEL</button>
         </div>
+        ${
+          isConfigOpen
+            ? `
+          <div class="timer-config-panel">
+            <div class="config-row">
+              <span class="config-label">CHIME</span>
+              <div class="pill-group">
+                <button class="pill-btn ${currentChime === 'global' ? 'active' : ''}" data-action="set-timer-chime" data-id="${t.id}" data-chime-val="global">GLOBAL</button>
+                <button class="pill-btn ${currentChime === 'pulse' ? 'active' : ''}" data-action="set-timer-chime" data-id="${t.id}" data-chime-val="pulse">PULSE</button>
+                <button class="pill-btn ${currentChime === 'digital' ? 'active' : ''}" data-action="set-timer-chime" data-id="${t.id}" data-chime-val="digital">DIGITAL</button>
+                <button class="pill-btn ${currentChime === 'radar' ? 'active' : ''}" data-action="set-timer-chime" data-id="${t.id}" data-chime-val="radar">RADAR</button>
+                <button class="pill-btn ${currentChime === 'alarm' ? 'active' : ''}" data-action="set-timer-chime" data-id="${t.id}" data-chime-val="alarm">ALARM</button>
+                <button class="pill-btn" data-action="preview-timer-chime" data-id="${t.id}" title="Preview Chime">▶</button>
+              </div>
+            </div>
+            <div class="config-row">
+              <span class="config-label">TOAST</span>
+              <div class="pill-group">
+                <button class="pill-btn ${currentToast === 'global' ? 'active' : ''}" data-action="set-timer-toast" data-id="${t.id}" data-toast-val="global">GLOBAL</button>
+                <button class="pill-btn ${currentToast === 'enabled' ? 'active' : ''}" data-action="set-timer-toast" data-id="${t.id}" data-toast-val="enabled">ON</button>
+                <button class="pill-btn ${currentToast === 'disabled' ? 'active' : ''}" data-action="set-timer-toast" data-id="${t.id}" data-toast-val="disabled">OFF</button>
+              </div>
+            </div>
+          </div>
+        `
+            : ''
+        }
       </div>
-    `
-      )
+    `;
+      })
       .join('');
 
     this.root.innerHTML = `
@@ -373,6 +470,10 @@ export class AppView {
   }
 
   private renderSettingsModal(settings: AppSettings): string {
+    const chimes: ChimeType[] = ['pulse', 'digital', 'radar', 'alarm'];
+    const activeChime = settings.defaultChime || 'pulse';
+    const activeDuration = settings.toastDuration || 'normal';
+
     return `
       <div class="modal-overlay" id="modal-overlay">
         <div class="modal-card">
@@ -385,6 +486,17 @@ export class AppView {
               <span>WINDOWS TOAST</span>
               <input type="checkbox" id="setting-toast" ${settings.toastNotifications ? 'checked' : ''} />
             </label>
+
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                <span>TOAST DURATION</span>
+              </div>
+              <div class="pill-group">
+                <button class="pill-btn pill-toast-dur ${activeDuration === 'normal' ? 'active' : ''}" data-duration="normal">NORMAL (~7S)</button>
+                <button class="pill-btn pill-toast-dur ${activeDuration === 'long' ? 'active' : ''}" data-duration="long">LONG (~25S)</button>
+              </div>
+            </div>
+
             <div style="display: flex; flex-direction: column; gap: 6px;">
               <div style="display: flex; justify-content: space-between; font-size: 11px;">
                 <span>VOLUME</span>
@@ -392,7 +504,24 @@ export class AppView {
               </div>
               <input type="range" id="setting-volume" min="0" max="1" step="0.05" value="${settings.soundVolume}" style="accent-color: var(--accent-red); cursor: pointer;" />
             </div>
-            <button class="btn" id="btn-test-chime" style="align-self: flex-start;">TEST CHIME</button>
+
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+                <span>DEFAULT CHIME</span>
+                <button class="btn" id="btn-test-chime" data-chime="${activeChime}" style="padding: 2px 8px; font-size: 10px;">TEST</button>
+              </div>
+              <div class="pill-group">
+                ${chimes
+                  .map(
+                    (c) => `
+                  <button class="pill-btn pill-chime-setting ${activeChime === c ? 'active' : ''}" data-chime="${c}">
+                    ${c.toUpperCase()}
+                  </button>
+                `
+                  )
+                  .join('')}
+              </div>
+            </div>
 
             <div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 12px;">
               <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
@@ -416,3 +545,4 @@ export class AppView {
     `;
   }
 }
+

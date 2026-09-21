@@ -27,6 +27,8 @@ export class TimerEngine {
       state: 'idle',
       remainingSeconds: Math.max(1, durationSeconds),
       endTimestamp: null,
+      chime: 'global',
+      toastOverride: 'global',
     };
     this.timers.set(item.id, item);
     return item;
@@ -34,6 +36,13 @@ export class TimerEngine {
 
   removeTimer(id: string): void {
     this.timers.delete(id);
+  }
+
+  updateConfig(id: string, chime: 'global' | import('./types').ChimeType, toastOverride: import('./types').ToastOverride): void {
+    const timer = this.timers.get(id);
+    if (!timer) return;
+    timer.chime = chime;
+    timer.toastOverride = toastOverride;
   }
 
   startTimer(id: string, now: number = Date.now()): void {
