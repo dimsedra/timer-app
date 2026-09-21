@@ -12,7 +12,9 @@ src-tauri/target/
 .vscode/
 .idea/
 
-# Signing keys (keep secret)
+# Signing keys & secrets (keep secret)
 *.key
 *.key.pub
+updater-secrets.md
+
 

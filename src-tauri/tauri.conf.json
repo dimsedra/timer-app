@@ -41,7 +41,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ1RDk3Q0ZBQkFGM0ZDMzAKUldRdy9QTzYrbnpaMVk1ZkhVdGdybUhTblQ4Zm1NazNVaUQwRVdzZnVLTmxjVWpRcGxYTkpMbUwK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEIxQzAyMjdFN0UyQjVEMgpSV1RTdGVMbkp3SWNDOVdkTFBVRHlxcUVwU1Bjb0tsMW9DK1N5eGltcFM0Mmp3YVhpb0xQQ1RDNwo=",
       "endpoints": [
         "https://github.com/dimsedra/timer-app/releases/latest/download/latest.json"
       ]
