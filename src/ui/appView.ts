@@ -15,7 +15,7 @@ export interface AppViewCallbacks {
   onReset: (id: string) => void;
   onToggleLoop: (id: string) => void;
   onDelete: (id: string) => void;
-  onAddTimer: (label: string, minutes: number, seconds: number, loop: boolean) => void;
+  onAddTimer: (label: string, hours: number, minutes: number, seconds: number, loop: boolean) => void;
   onToggleMini: () => void;
   onMinimize: () => void;
   onClose: () => void;
@@ -26,6 +26,7 @@ export interface AppViewCallbacks {
   onPreviewChime?: (chime: ChimeType) => void;
   onUpdateTimerConfig?: (id: string, chime: 'global' | ChimeType, toastOverride: ToastOverride) => void;
   onRenameTimer?: (id: string, newLabel: string) => void;
+  onUpdateTimerDuration?: (id: string, newTotalSeconds: number) => void;
 }
 
 export class AppView {
@@ -45,9 +46,13 @@ export class AppView {
   }
 
   private formatTime(seconds: number): string {
-    const mins = Math.floor(seconds / 60);
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     const pad = (n: number) => n.toString().padStart(2, '0');
+    if (hrs > 0) {
+      return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+    }
     return `${pad(mins)}:${pad(secs)}`;
   }
 
@@ -149,6 +154,40 @@ export class AppView {
         return;
       }
 
+      // Preview chime inside timer config panel
+      if (button.classList.contains('btn-preview-chime') && button.dataset.id) {
+        const id = button.dataset.id;
+        const select = this.root.querySelector<HTMLSelectElement>(`.select-cfg-chime[data-id="${id}"]`);
+        let chimeVal = (select?.value || 'global') as 'global' | ChimeType;
+        if (chimeVal === 'global') {
+          chimeVal = this.lastSettings?.defaultChime || 'pulse';
+        }
+        if (this.callbacks.onPreviewChime) {
+          this.callbacks.onPreviewChime(chimeVal as ChimeType);
+        } else {
+          this.callbacks.onTestChime(chimeVal as ChimeType);
+        }
+        return;
+      }
+
+      // Save custom duration from CFG panel
+      if (button.classList.contains('btn-save-dur') && button.dataset.id) {
+        const id = button.dataset.id;
+        const hrInput = this.root.querySelector<HTMLInputElement>(`.input-dur-hr[data-id="${id}"]`);
+        const minInput = this.root.querySelector<HTMLInputElement>(`.input-dur-min[data-id="${id}"]`);
+        const secInput = this.root.querySelector<HTMLInputElement>(`.input-dur-sec[data-id="${id}"]`);
+
+        const h = parseInt(hrInput?.value || '0', 10) || 0;
+        const m = parseInt(minInput?.value || '0', 10) || 0;
+        const s = parseInt(secInput?.value || '0', 10) || 0;
+        const total = h * 3600 + m * 60 + s;
+
+        if (total > 0 && this.callbacks.onUpdateTimerDuration) {
+          this.callbacks.onUpdateTimerDuration(id, total);
+        }
+        return;
+      }
+
       // Setting modal chime pill selector
       if (button.classList.contains('pill-chime-setting') && button.dataset.chime && this.lastSettings) {
         const chime = button.dataset.chime as ChimeType;
@@ -186,80 +225,84 @@ export class AppView {
           }
           if (this.lastSettings) this.render(this.lastTimers, this.lastSettings, this.isMini);
         }
-        if (action === 'set-timer-chime') {
-          const chimeVal = button.dataset.chimeVal as 'global' | ChimeType;
-          const timer = this.lastTimers.find((t) => t.id === id);
-          if (timer && this.callbacks.onUpdateTimerConfig) {
-            this.callbacks.onUpdateTimerConfig(id, chimeVal, timer.toastOverride ?? 'global');
-          }
-        }
-        if (action === 'preview-timer-chime') {
-          const timer = this.lastTimers.find((t) => t.id === id);
-          const chimeType = (timer?.chime && timer.chime !== 'global')
-            ? timer.chime
-            : (this.lastSettings?.defaultChime || 'pulse');
-          if (this.callbacks.onPreviewChime) {
-            this.callbacks.onPreviewChime(chimeType);
-          } else {
-            this.callbacks.onTestChime(chimeType);
-          }
-        }
-        if (action === 'set-timer-toast') {
-          const toastVal = button.dataset.toastVal as ToastOverride;
-          const timer = this.lastTimers.find((t) => t.id === id);
-          if (timer && this.callbacks.onUpdateTimerConfig) {
-            this.callbacks.onUpdateTimerConfig(id, timer.chime ?? 'global', toastVal);
-          }
-        }
         return;
       }
     });
 
-    // Form submit delegation
+    // Form submit delegation (+ NEW TIMER)
     this.root.addEventListener('submit', (e) => {
       const target = e.target as HTMLFormElement;
       if (target && target.id === 'form-add-timer') {
         e.preventDefault();
         const labelInput = target.querySelector<HTMLInputElement>('#input-label');
+        const hrsInput = target.querySelector<HTMLInputElement>('#input-hrs');
         const minsInput = target.querySelector<HTMLInputElement>('#input-mins');
         const secsInput = target.querySelector<HTMLInputElement>('#input-secs');
         const loopInput = target.querySelector<HTMLInputElement>('#input-loop');
 
         const label = labelInput?.value.trim() || '';
+        const hrs = parseInt(hrsInput?.value || '0', 10) || 0;
         const mins = parseInt(minsInput?.value || '0', 10) || 0;
         const secs = parseInt(secsInput?.value || '0', 10) || 0;
         const loop = loopInput ? loopInput.checked : true;
 
-        if (mins <= 0 && secs <= 0) {
+        if (hrs <= 0 && mins <= 0 && secs <= 0) {
           minsInput?.focus();
           return;
         }
 
-        this.callbacks.onAddTimer(label, mins, secs, loop);
+        this.callbacks.onAddTimer(label, hrs, mins, secs, loop);
         target.reset();
       }
     });
 
-    // Inputs delegation for settings & config
+    // Change delegation for select dropdowns & inputs
     this.root.addEventListener('change', (e) => {
-      const target = e.target as HTMLInputElement;
+      const target = e.target as HTMLElement;
       if (!target) return;
 
       if (target.id === 'setting-toast' && this.lastSettings) {
+        const checkbox = target as HTMLInputElement;
         this.callbacks.onSaveSettings({
           ...this.lastSettings,
-          toastNotifications: target.checked,
+          toastNotifications: checkbox.checked,
         });
         return;
       }
 
-      // Timer title change from CFG panel input
-      if (target.classList.contains('input-cfg-label')) {
-        const id = target.dataset.id;
-        const newText = target.value.trim();
+      // Title edit in CFG panel
+      if (target.classList.contains('input-cfg-title')) {
+        const input = target as HTMLInputElement;
+        const id = input.dataset.id;
+        const newText = input.value.trim();
         if (id && newText && this.callbacks.onRenameTimer) {
           this.callbacks.onRenameTimer(id, newText);
         }
+        return;
+      }
+
+      // Chime dropdown change
+      if (target.classList.contains('select-cfg-chime')) {
+        const select = target as HTMLSelectElement;
+        const id = select.dataset.id;
+        const chimeVal = select.value as 'global' | ChimeType;
+        const timer = this.lastTimers.find((t) => t.id === id);
+        if (id && timer && this.callbacks.onUpdateTimerConfig) {
+          this.callbacks.onUpdateTimerConfig(id, chimeVal, timer.toastOverride ?? 'global');
+        }
+        return;
+      }
+
+      // Toast dropdown change
+      if (target.classList.contains('select-cfg-toast')) {
+        const select = target as HTMLSelectElement;
+        const id = select.dataset.id;
+        const toastVal = select.value as ToastOverride;
+        const timer = this.lastTimers.find((t) => t.id === id);
+        if (id && timer && this.callbacks.onUpdateTimerConfig) {
+          this.callbacks.onUpdateTimerConfig(id, timer.chime ?? 'global', toastVal);
+        }
+        return;
       }
     });
 
@@ -330,6 +373,10 @@ export class AppView {
   }
 
   render(timers: TimerItem[], settings: AppSettings, isMini: boolean): void {
+    // Preserve scroll position
+    const container = this.root.querySelector('.container');
+    const savedScrollTop = container ? container.scrollTop : 0;
+
     this.lastTimers = timers;
     this.lastSettings = settings;
     this.isMini = isMini;
@@ -341,6 +388,12 @@ export class AppView {
       this.renderMini(timers, hasRunningTimer);
     } else {
       this.renderNormal(timers, settings, hasRunningTimer);
+    }
+
+    // Restore scroll position
+    const newContainer = this.root.querySelector('.container');
+    if (newContainer && savedScrollTop > 0) {
+      newContainer.scrollTop = savedScrollTop;
     }
   }
 
@@ -402,6 +455,10 @@ export class AppView {
         const currentChime = t.chime ?? 'global';
         const currentToast = t.toastOverride ?? 'global';
 
+        const durHrs = Math.floor(t.durationSeconds / 3600);
+        const durMins = Math.floor((t.durationSeconds % 3600) / 60);
+        const durSecs = t.durationSeconds % 60;
+
         return `
       <div class="timer-card" data-timer-id="${t.id}">
         <div class="timer-header">
@@ -429,29 +486,35 @@ export class AppView {
           isConfigOpen
             ? `
           <div class="timer-config-panel">
-            <div class="config-row">
-              <span class="config-label">TITLE</span>
-              <input type="text" class="input-field input-cfg-label" data-id="${t.id}" value="${t.label}" maxlength="24" placeholder="TIMER LABEL" />
+            <span class="config-label">TITLE</span>
+            <input type="text" class="input-field input-cfg-title" data-id="${t.id}" value="${t.label}" maxlength="24" placeholder="TIMER TITLE" />
+
+            <span class="config-label">TIME</span>
+            <div class="cfg-time-inputs">
+              <input type="number" class="input-field input-dur-hr" data-id="${t.id}" min="0" max="99" placeholder="HR" value="${durHrs > 0 ? durHrs : ''}" />
+              <input type="number" class="input-field input-dur-min" data-id="${t.id}" min="0" max="59" placeholder="MIN" value="${durMins > 0 ? durMins : ''}" />
+              <input type="number" class="input-field input-dur-sec" data-id="${t.id}" min="0" max="59" placeholder="SEC" value="${durSecs > 0 ? durSecs : ''}" />
+              <button class="btn btn-save-dur" data-id="${t.id}" style="padding: 4px 8px; font-size: 10px;">SET</button>
             </div>
-            <div class="config-row">
-              <span class="config-label">CHIME</span>
-              <div class="pill-group">
-                <button class="pill-btn ${currentChime === 'global' ? 'active' : ''}" data-action="set-timer-chime" data-id="${t.id}" data-chime-val="global">GLOBAL</button>
-                <button class="pill-btn ${currentChime === 'pulse' ? 'active' : ''}" data-action="set-timer-chime" data-id="${t.id}" data-chime-val="pulse">PULSE</button>
-                <button class="pill-btn ${currentChime === 'digital' ? 'active' : ''}" data-action="set-timer-chime" data-id="${t.id}" data-chime-val="digital">DIGITAL</button>
-                <button class="pill-btn ${currentChime === 'radar' ? 'active' : ''}" data-action="set-timer-chime" data-id="${t.id}" data-chime-val="radar">RADAR</button>
-                <button class="pill-btn ${currentChime === 'alarm' ? 'active' : ''}" data-action="set-timer-chime" data-id="${t.id}" data-chime-val="alarm">ALARM</button>
-                <button class="pill-btn" data-action="preview-timer-chime" data-id="${t.id}" title="Preview Chime">▶</button>
-              </div>
+
+            <span class="config-label">CHIME</span>
+            <div class="cfg-chime-row">
+              <select class="select-field select-cfg-chime" data-id="${t.id}">
+                <option value="global" ${currentChime === 'global' ? 'selected' : ''}>GLOBAL (DEFAULT)</option>
+                <option value="pulse" ${currentChime === 'pulse' ? 'selected' : ''}>PULSE</option>
+                <option value="digital" ${currentChime === 'digital' ? 'selected' : ''}>DIGITAL</option>
+                <option value="radar" ${currentChime === 'radar' ? 'selected' : ''}>RADAR</option>
+                <option value="alarm" ${currentChime === 'alarm' ? 'selected' : ''}>ALARM</option>
+              </select>
+              <button class="btn btn-preview-chime" data-id="${t.id}" title="Preview Chime" style="padding: 4px 8px; flex-shrink: 0;">▶</button>
             </div>
-            <div class="config-row">
-              <span class="config-label">TOAST</span>
-              <div class="pill-group">
-                <button class="pill-btn ${currentToast === 'global' ? 'active' : ''}" data-action="set-timer-toast" data-id="${t.id}" data-toast-val="global">GLOBAL</button>
-                <button class="pill-btn ${currentToast === 'enabled' ? 'active' : ''}" data-action="set-timer-toast" data-id="${t.id}" data-toast-val="enabled">ON</button>
-                <button class="pill-btn ${currentToast === 'disabled' ? 'active' : ''}" data-action="set-timer-toast" data-id="${t.id}" data-toast-val="disabled">OFF</button>
-              </div>
-            </div>
+
+            <span class="config-label">TOAST</span>
+            <select class="select-field select-cfg-toast" data-id="${t.id}">
+              <option value="global" ${currentToast === 'global' ? 'selected' : ''}>GLOBAL (DEFAULT)</option>
+              <option value="enabled" ${currentToast === 'enabled' ? 'selected' : ''}>ALWAYS ON</option>
+              <option value="disabled" ${currentToast === 'disabled' ? 'selected' : ''}>MUTED</option>
+            </select>
           </div>
         `
             : ''
@@ -509,7 +572,8 @@ export class AppView {
           <form id="form-add-timer">
             <div class="form-row">
               <input type="text" id="input-label" class="input-field" placeholder="LABEL (OPTIONAL)" maxlength="24" />
-              <input type="number" id="input-mins" class="input-field" placeholder="MIN" min="0" max="999" />
+              <input type="number" id="input-hrs" class="input-field" placeholder="HR" min="0" max="99" />
+              <input type="number" id="input-mins" class="input-field" placeholder="MIN" min="0" max="59" />
               <input type="number" id="input-secs" class="input-field" placeholder="SEC" min="0" max="59" />
             </div>
             <div style="display: flex; align-items: center; justify-content: space-between;">

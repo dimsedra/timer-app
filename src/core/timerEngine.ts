@@ -54,6 +54,21 @@ export class TimerEngine {
     }
   }
 
+  updateTimerDuration(id: string, newTotalSeconds: number, now: number = Date.now()): void {
+    const timer = this.timers.get(id);
+    if (!timer) return;
+    const validSeconds = Math.max(1, Math.round(newTotalSeconds));
+    timer.durationSeconds = validSeconds;
+
+    if (timer.state === 'running') {
+      timer.remainingSeconds = validSeconds;
+      timer.endTimestamp = now + validSeconds * 1000;
+    } else {
+      timer.remainingSeconds = validSeconds;
+      timer.endTimestamp = null;
+    }
+  }
+
   startTimer(id: string, now: number = Date.now()): void {
     const timer = this.timers.get(id);
     if (!timer || timer.state === 'running') return;

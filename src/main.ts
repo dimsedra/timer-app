@@ -90,8 +90,8 @@ async function bootstrap() {
       storage.saveTimers(engine.getTimers());
       renderCurrent();
     },
-    onAddTimer: (label, mins, secs, loop) => {
-      const totalSeconds = mins * 60 + secs;
+    onAddTimer: (label, hrs, mins, secs, loop) => {
+      const totalSeconds = hrs * 3600 + mins * 60 + secs;
       if (totalSeconds <= 0) return;
       engine.addTimer(label, totalSeconds, loop);
       storage.saveTimers(engine.getTimers());
@@ -127,6 +127,11 @@ async function bootstrap() {
     },
     onRenameTimer: (id, newLabel) => {
       engine.renameTimer(id, newLabel);
+      storage.saveTimers(engine.getTimers());
+      renderCurrent();
+    },
+    onUpdateTimerDuration: (id, newTotalSeconds) => {
+      engine.updateTimerDuration(id, newTotalSeconds);
       storage.saveTimers(engine.getTimers());
       renderCurrent();
     },

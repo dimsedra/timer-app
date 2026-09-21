@@ -94,4 +94,25 @@ describe('TimerEngine', () => {
     engine.renameTimer(timer.id, '   ');
     expect(engine.getTimer(timer.id)?.label).toBe('New Name');
   });
+
+  it('updates timer duration and recalculates remaining seconds', () => {
+    const timer = engine.addTimer('Hour Timer', 3600, false);
+    expect(timer.remainingSeconds).toBe(3600);
+
+    // Update idle timer duration to 7200 (2 hours)
+    engine.updateTimerDuration(timer.id, 7200);
+    expect(engine.getTimer(timer.id)?.durationSeconds).toBe(7200);
+    expect(engine.getTimer(timer.id)?.remainingSeconds).toBe(7200);
+
+    // Start timer, advance 100 seconds
+    const startTime = 1000000;
+    engine.startTimer(timer.id, startTime);
+    engine.tick(startTime + 100000);
+    expect(engine.getTimer(timer.id)?.remainingSeconds).toBe(7100);
+
+    // Update running timer duration
+    engine.updateTimerDuration(timer.id, 5000, startTime + 100000);
+    expect(engine.getTimer(timer.id)?.durationSeconds).toBe(5000);
+    expect(engine.getTimer(timer.id)?.remainingSeconds).toBe(5000);
+  });
 });
