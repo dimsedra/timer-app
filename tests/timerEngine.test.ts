@@ -84,4 +84,14 @@ describe('TimerEngine', () => {
     engine.tick(startTime + 13000);
     expect(engine.getTimer(timer.id)?.remainingSeconds).toBe(7);
   });
+
+  it('renames a timer label correctly', () => {
+    const timer = engine.addTimer('Old Name', 60, false);
+    engine.renameTimer(timer.id, 'New Name');
+    expect(engine.getTimer(timer.id)?.label).toBe('New Name');
+
+    // Empty input shouldn't wipe the label
+    engine.renameTimer(timer.id, '   ');
+    expect(engine.getTimer(timer.id)?.label).toBe('New Name');
+  });
 });

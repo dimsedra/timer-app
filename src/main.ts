@@ -125,6 +125,11 @@ async function bootstrap() {
       storage.saveTimers(engine.getTimers());
       renderCurrent();
     },
+    onRenameTimer: (id, newLabel) => {
+      engine.renameTimer(id, newLabel);
+      storage.saveTimers(engine.getTimers());
+      renderCurrent();
+    },
     onCheckUpdate: async () => {
       appView.setUpdateInfo({ available: false, message: 'CHECKING...' });
       const status = await updater.checkForUpdates();

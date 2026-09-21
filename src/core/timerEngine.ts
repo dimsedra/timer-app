@@ -45,6 +45,15 @@ export class TimerEngine {
     timer.toastOverride = toastOverride;
   }
 
+  renameTimer(id: string, newLabel: string): void {
+    const timer = this.timers.get(id);
+    if (!timer) return;
+    const trimmed = newLabel.trim();
+    if (trimmed) {
+      timer.label = trimmed;
+    }
+  }
+
   startTimer(id: string, now: number = Date.now()): void {
     const timer = this.timers.get(id);
     if (!timer || timer.state === 'running') return;

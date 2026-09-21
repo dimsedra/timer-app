@@ -1,4 +1,5 @@
 import { TimerItem, AppSettings, ChimeType, ToastDuration, ToastOverride } from '../core/types';
+import { ICONS } from './icons';
 
 export interface UpdateInfo {
   available: boolean;
@@ -24,6 +25,7 @@ export interface AppViewCallbacks {
   onInstallUpdate: () => void;
   onPreviewChime?: (chime: ChimeType) => void;
   onUpdateTimerConfig?: (id: string, chime: 'global' | ChimeType, toastOverride: ToastOverride) => void;
+  onRenameTimer?: (id: string, newLabel: string) => void;
 }
 
 export class AppView {
@@ -59,6 +61,48 @@ export class AppView {
       if (target.id === 'modal-overlay') {
         this.showSettings = false;
         if (this.lastSettings) this.render(this.lastTimers, this.lastSettings, this.isMini);
+        return;
+      }
+
+      // Inline label rename click
+      const labelEl = target.closest('.timer-label') as HTMLElement | null;
+      if (labelEl && !labelEl.querySelector('input')) {
+        const id = labelEl.dataset.id;
+        if (!id) return;
+        const currentText = labelEl.textContent || '';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'input-inline-label';
+        input.value = currentText;
+        input.maxLength = 24;
+
+        labelEl.textContent = '';
+        labelEl.appendChild(input);
+        input.focus();
+        input.select();
+
+        let finished = false;
+        const finish = (save: boolean) => {
+          if (finished) return;
+          finished = true;
+          const newText = input.value.trim();
+          if (save && newText && newText !== currentText && this.callbacks.onRenameTimer) {
+            this.callbacks.onRenameTimer(id, newText);
+          } else {
+            labelEl.textContent = currentText;
+          }
+        };
+
+        input.addEventListener('blur', () => finish(true));
+        input.addEventListener('keydown', (ke) => {
+          if (ke.key === 'Enter') {
+            ke.preventDefault();
+            finish(true);
+          } else if (ke.key === 'Escape') {
+            ke.preventDefault();
+            finish(false);
+          }
+        });
         return;
       }
 
@@ -196,16 +240,26 @@ export class AppView {
       }
     });
 
-    // Inputs delegation for settings
+    // Inputs delegation for settings & config
     this.root.addEventListener('change', (e) => {
       const target = e.target as HTMLInputElement;
-      if (!target || !this.lastSettings) return;
+      if (!target) return;
 
-      if (target.id === 'setting-toast') {
+      if (target.id === 'setting-toast' && this.lastSettings) {
         this.callbacks.onSaveSettings({
           ...this.lastSettings,
           toastNotifications: target.checked,
         });
+        return;
+      }
+
+      // Timer title change from CFG panel input
+      if (target.classList.contains('input-cfg-label')) {
+        const id = target.dataset.id;
+        const newText = target.value.trim();
+        if (id && newText && this.callbacks.onRenameTimer) {
+          this.callbacks.onRenameTimer(id, newText);
+        }
       }
     });
 
@@ -306,7 +360,7 @@ export class AppView {
           (t) => `
         <div class="timer-card" data-timer-id="${t.id}">
           <div class="timer-header">
-            <span class="timer-label" title="${t.label}">${t.label}</span>
+            <span class="timer-label" data-id="${t.id}" title="Click to rename">${t.label}</span>
             <span class="badge-loop ${t.loop ? 'active' : ''}">
               ${t.loop ? 'LOOP' : 'ONCE'}
             </span>
@@ -333,8 +387,8 @@ export class AppView {
           MINI
         </div>
         <div class="titlebar-actions" data-tauri-drag-region="false">
-          <button class="btn-icon" id="btn-expand" title="Expand to Normal View">[^]</button>
-          <button class="btn-icon" id="titlebar-close" title="Close">x</button>
+          <button class="btn-icon" id="btn-expand" title="Expand to Normal View">${ICONS.expand}</button>
+          <button class="btn-icon" id="titlebar-close" title="Close">${ICONS.close}</button>
         </div>
       </div>
       <div class="container">${contentHtml}</div>
@@ -351,7 +405,7 @@ export class AppView {
         return `
       <div class="timer-card" data-timer-id="${t.id}">
         <div class="timer-header">
-          <span class="timer-label" title="${t.label}">${t.label}</span>
+          <span class="timer-label" data-id="${t.id}" title="Click to rename">${t.label}</span>
           <div style="display: flex; align-items: center; gap: 6px;">
             <button class="btn btn-cfg ${isConfigOpen ? 'active' : ''}" data-action="toggle-cfg" data-id="${t.id}" title="Toggle Timer Configuration">
               [CFG]
@@ -375,6 +429,10 @@ export class AppView {
           isConfigOpen
             ? `
           <div class="timer-config-panel">
+            <div class="config-row">
+              <span class="config-label">TITLE</span>
+              <input type="text" class="input-field input-cfg-label" data-id="${t.id}" value="${t.label}" maxlength="24" placeholder="TIMER LABEL" />
+            </div>
             <div class="config-row">
               <span class="config-label">CHIME</span>
               <div class="pill-group">
@@ -410,10 +468,10 @@ export class AppView {
           TIMER // DESKTOP
         </div>
         <div class="titlebar-actions" data-tauri-drag-region="false">
-          <button class="btn-icon" id="btn-compact" title="Switch to Mini Floating Mode">_[]</button>
-          <button class="btn-icon" id="btn-settings" title="Settings">*</button>
-          <button class="btn-icon" id="titlebar-minimize" title="Minimize">-</button>
-          <button class="btn-icon" id="titlebar-close" title="Close">x</button>
+          <button class="btn-icon" id="btn-compact" title="Switch to Mini Floating Mode">${ICONS.compact}</button>
+          <button class="btn-icon" id="btn-settings" title="Settings">${ICONS.settings}</button>
+          <button class="btn-icon" id="titlebar-minimize" title="Minimize">${ICONS.minimize}</button>
+          <button class="btn-icon" id="titlebar-close" title="Close">${ICONS.close}</button>
         </div>
       </div>
 
@@ -479,7 +537,7 @@ export class AppView {
         <div class="modal-card">
           <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
             <span style="font-size: 11px; letter-spacing: 0.1em;">SETTINGS</span>
-            <button class="btn-icon" id="btn-close-settings">x</button>
+            <button class="btn-icon" id="btn-close-settings" title="Close">${ICONS.close}</button>
           </div>
           <div style="display: flex; flex-direction: column; gap: 14px;">
             <label style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-primary); cursor: pointer;">
@@ -545,4 +603,3 @@ export class AppView {
     `;
   }
 }
-
