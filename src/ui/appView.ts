@@ -120,10 +120,15 @@ export class AppView {
         const secsInput = target.querySelector<HTMLInputElement>('#input-secs');
         const loopInput = target.querySelector<HTMLInputElement>('#input-loop');
 
-        const label = labelInput?.value || '';
+        const label = labelInput?.value.trim() || '';
         const mins = parseInt(minsInput?.value || '0', 10) || 0;
         const secs = parseInt(secsInput?.value || '0', 10) || 0;
         const loop = loopInput ? loopInput.checked : true;
+
+        if (mins <= 0 && secs <= 0) {
+          minsInput?.focus();
+          return;
+        }
 
         this.callbacks.onAddTimer(label, mins, secs, loop);
         target.reset();
@@ -349,8 +354,8 @@ export class AppView {
           <form id="form-add-timer">
             <div class="form-row">
               <input type="text" id="input-label" class="input-field" placeholder="LABEL (OPTIONAL)" maxlength="24" />
-              <input type="number" id="input-mins" class="input-field" placeholder="MIN" min="0" max="999" value="5" required />
-              <input type="number" id="input-secs" class="input-field" placeholder="SEC" min="0" max="59" value="0" required />
+              <input type="number" id="input-mins" class="input-field" placeholder="MIN" min="0" max="999" />
+              <input type="number" id="input-secs" class="input-field" placeholder="SEC" min="0" max="59" />
             </div>
             <div style="display: flex; align-items: center; justify-content: space-between;">
               <label style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-muted); cursor: pointer;">
