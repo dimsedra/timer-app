@@ -20,7 +20,9 @@
         "resizable": true,
         "decorations": false,
         "transparent": false,
-        "center": true
+        "center": true,
+        "theme": "Dark",
+        "backgroundColor": "#080808"
       }
     ],
     "security": {
