@@ -17,6 +17,7 @@ src-tauri/target/
 *.key.pub
 updater-secrets.md
 .superpowers/
+docs/superpowers/
 
 
 
