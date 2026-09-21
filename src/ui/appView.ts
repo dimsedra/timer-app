@@ -53,11 +53,8 @@ export class AppView {
     let contentHtml = '';
     if (activeTimers.length === 0) {
       contentHtml = `
-        <div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 11px;">
+        <div style="padding: 24px 12px; text-align: center; color: var(--text-muted); font-size: 11px; letter-spacing: 0.08em;">
           NO ACTIVE TIMERS
-          <div style="margin-top: 6px;">
-            <button class="btn btn-expand" id="btn-expand">EXPAND [^]</button>
-          </div>
         </div>
       `;
     } else {
@@ -66,8 +63,8 @@ export class AppView {
           (t) => `
         <div class="timer-card">
           <div class="timer-header">
-            <span class="timer-label">${t.label}</span>
-            <span style="font-size: 10px; color: ${t.loop ? 'var(--accent-red)' : 'var(--text-muted)'};">
+            <span class="timer-label" title="${t.label}">${t.label}</span>
+            <span class="badge-loop ${t.loop ? 'active' : ''}">
               ${t.loop ? 'LOOP' : 'ONCE'}
             </span>
           </div>
@@ -79,7 +76,6 @@ export class AppView {
                 : `<button class="btn btn-primary" data-action="start" data-id="${t.id}">START</button>`
             }
             <button class="btn" data-action="reset" data-id="${t.id}">RESET</button>
-            <button class="btn btn-expand" style="margin-left: auto;" id="btn-expand">EXPAND [^]</button>
           </div>
         </div>
       `
@@ -94,7 +90,8 @@ export class AppView {
           MINI
         </div>
         <div class="titlebar-actions">
-          <button class="btn-icon" id="titlebar-close">x</button>
+          <button class="btn-icon" id="btn-expand" title="Expand to Normal View">[^]</button>
+          <button class="btn-icon" id="titlebar-close" title="Close">x</button>
         </div>
       </div>
       <div class="container">${contentHtml}</div>
@@ -109,7 +106,7 @@ export class AppView {
         (t) => `
       <div class="timer-card">
         <div class="timer-header">
-          <span class="timer-label">${t.label}</span>
+          <span class="timer-label" title="${t.label}">${t.label}</span>
           <button class="btn btn-loop ${t.loop ? 'active' : ''}" data-action="loop" data-id="${t.id}">
             LOOP [${t.loop ? 'ON' : 'OFF'}]
           </button>
@@ -136,10 +133,10 @@ export class AppView {
           TIMER // DESKTOP
         </div>
         <div class="titlebar-actions">
-          <button class="btn-icon" id="btn-compact" title="Switch to Compact Mini Window">_[]</button>
+          <button class="btn-icon" id="btn-compact" title="Switch to Mini Floating Mode">_[]</button>
           <button class="btn-icon" id="btn-settings" title="Settings">*</button>
-          <button class="btn-icon" id="titlebar-minimize">-</button>
-          <button class="btn-icon" id="titlebar-close">x</button>
+          <button class="btn-icon" id="titlebar-minimize" title="Minimize">-</button>
+          <button class="btn-icon" id="titlebar-close" title="Close">x</button>
         </div>
       </div>
 
@@ -154,9 +151,9 @@ export class AppView {
           </div>
           <form id="form-add-timer">
             <div class="form-row">
-              <input type="text" id="input-label" class="input-field" placeholder="LABEL (OPTIONAL)" style="flex: 2;" />
-              <input type="number" id="input-mins" class="input-field" placeholder="MIN" min="0" max="999" value="5" style="flex: 1;" required />
-              <input type="number" id="input-secs" class="input-field" placeholder="SEC" min="0" max="59" value="0" style="flex: 1;" required />
+              <input type="text" id="input-label" class="input-field" placeholder="LABEL (OPTIONAL)" maxlength="24" />
+              <input type="number" id="input-mins" class="input-field" placeholder="MIN" min="0" max="999" value="5" required />
+              <input type="number" id="input-secs" class="input-field" placeholder="SEC" min="0" max="59" value="0" required />
             </div>
             <div style="display: flex; align-items: center; justify-content: space-between;">
               <label style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-muted); cursor: pointer;">
@@ -193,7 +190,7 @@ export class AppView {
                 <span>VOLUME</span>
                 <span id="volume-val">${Math.round(settings.soundVolume * 100)}%</span>
               </div>
-              <input type="range" id="setting-volume" min="0" max="1" step="0.05" value="${settings.soundVolume}" />
+              <input type="range" id="setting-volume" min="0" max="1" step="0.05" value="${settings.soundVolume}" style="accent-color: var(--accent-red); cursor: pointer;" />
             </div>
             <button class="btn" id="btn-test-chime" style="align-self: flex-start;">TEST CHIME</button>
           </div>

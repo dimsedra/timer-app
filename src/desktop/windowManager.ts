@@ -12,12 +12,13 @@ export class WindowManager {
     this.mini = enabled;
     try {
       if (enabled) {
-        // Compact mini window height scales slightly with active timers (min 110, max 260)
-        const computedHeight = Math.min(260, Math.max(110, 50 + activeTimerCount * 55));
-        await this.appWindow.setSize(new LogicalSize(240, computedHeight));
+        // Mini mode: width 280px, height dynamically tailored to active timer count (min 154px, max 360px)
+        const count = Math.max(1, activeTimerCount);
+        const computedHeight = Math.min(360, 48 + count * 106);
+        await this.appWindow.setSize(new LogicalSize(280, computedHeight));
         await this.appWindow.setAlwaysOnTop(true);
       } else {
-        await this.appWindow.setSize(new LogicalSize(380, 520));
+        await this.appWindow.setSize(new LogicalSize(360, 420));
         await this.appWindow.setAlwaysOnTop(false);
       }
     } catch (err) {
