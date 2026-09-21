@@ -119,11 +119,26 @@ body {
 .container {
   height: calc(100vh - 34px);
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 14px;
   scrollbar-gutter: stable;
+  transition: opacity 130ms cubic-bezier(0.16, 1, 0.3, 1), transform 130ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.container.mode-exit {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.985);
+  pointer-events: none;
+  transition: opacity 95ms ease-in, transform 95ms ease-in;
+}
+
+.container.mode-enter {
+  opacity: 0;
+  transform: translateY(4px) scale(0.985);
 }
 
 .container::-webkit-scrollbar {

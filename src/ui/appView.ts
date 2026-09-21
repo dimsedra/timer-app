@@ -38,11 +38,20 @@ export class AppView {
   private lastSettings: AppSettings | null = null;
   private updateInfo: UpdateInfo = { available: false };
   private isMini = false;
+  private previousMini: boolean | null = null;
 
   constructor(root: HTMLElement, callbacks: AppViewCallbacks) {
     this.root = root;
     this.callbacks = callbacks;
     this.initGlobalDelegation();
+  }
+
+  public async animateExit(): Promise<void> {
+    const container = this.root.querySelector('.container');
+    if (container) {
+      container.classList.add('mode-exit');
+      await new Promise((resolve) => setTimeout(resolve, 95));
+    }
   }
 
   private formatTime(seconds: number): string {
@@ -377,6 +386,9 @@ export class AppView {
     const container = this.root.querySelector('.container');
     const savedScrollTop = container ? container.scrollTop : 0;
 
+    const modeChanged = this.previousMini !== null && this.previousMini !== isMini;
+    this.previousMini = isMini;
+
     this.lastTimers = timers;
     this.lastSettings = settings;
     this.isMini = isMini;
@@ -385,9 +397,18 @@ export class AppView {
     const hasRunningTimer = timers.some((t) => t.state === 'running');
 
     if (isMini) {
-      this.renderMini(timers, hasRunningTimer);
+      this.renderMini(timers, hasRunningTimer, modeChanged);
     } else {
-      this.renderNormal(timers, settings, hasRunningTimer);
+      this.renderNormal(timers, settings, hasRunningTimer, modeChanged);
+    }
+
+    if (modeChanged) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const c = this.root.querySelector('.container');
+          if (c) c.classList.remove('mode-enter');
+        });
+      });
     }
 
     // Restore scroll position
@@ -397,7 +418,7 @@ export class AppView {
     }
   }
 
-  private renderMini(timers: TimerItem[], hasRunning: boolean): void {
+  private renderMini(timers: TimerItem[], hasRunning: boolean, isEnter = false): void {
     const activeTimers = timers.filter((t) => t.state === 'running' || t.state === 'paused');
 
     let contentHtml = '';
@@ -444,11 +465,11 @@ export class AppView {
           <button class="btn-icon" id="titlebar-close" title="Close">${ICONS.close}</button>
         </div>
       </div>
-      <div class="container">${contentHtml}</div>
+      <div class="container ${isEnter ? 'mode-enter' : ''}">${contentHtml}</div>
     `;
   }
 
-  private renderNormal(timers: TimerItem[], settings: AppSettings, hasRunning: boolean): void {
+  private renderNormal(timers: TimerItem[], settings: AppSettings, hasRunning: boolean, isEnter = false): void {
     const timerCardsHtml = timers
       .map((t) => {
         const isConfigOpen = this.expandedTimerConfigs.has(t.id);
@@ -538,7 +559,7 @@ export class AppView {
         </div>
       </div>
 
-      <div class="container">
+      <div class="container ${isEnter ? 'mode-enter' : ''}">
         ${
           this.updateInfo.available
             ? `

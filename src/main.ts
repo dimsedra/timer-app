@@ -64,6 +64,8 @@ async function bootstrap() {
     appView.render(engine.getTimers(), settings, windowManager.isMiniMode);
   };
 
+  let isTogglingMini = false;
+
   const appView = new AppView(appRoot, {
     onStart: (id) => {
       engine.startTimer(id);
@@ -98,9 +100,16 @@ async function bootstrap() {
       renderCurrent();
     },
     onToggleMini: async () => {
-      const activeCount = engine.getTimers().filter((t) => t.state === 'running' || t.state === 'paused').length;
-      await windowManager.toggleMiniMode(activeCount || 1);
-      renderCurrent();
+      if (isTogglingMini) return;
+      isTogglingMini = true;
+      try {
+        await appView.animateExit();
+        const activeCount = engine.getTimers().filter((t) => t.state === 'running' || t.state === 'paused').length;
+        await windowManager.toggleMiniMode(activeCount || 1);
+        renderCurrent();
+      } finally {
+        isTogglingMini = false;
+      }
     },
     onMinimize: async () => {
       await windowManager.minimize();
